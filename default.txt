@@ -1,0 +1,21 @@
+start -> scale(10, 30, 6) { house }
+
+
+  house -> split(z, 2) { htop hfloor hbottom }
+
+  htop -> components() { roof floor side side side side }
+  hfloor -> components() { ceiling floor side side side side }
+  hbottom -> components() { ceiling floor front_with_door side side side }
+
+  side -> draw( 0.3, 0.3, 0.3 ) {draw}
+  bottom -> draw( 0, 0, 0 ) {draw}
+  roof -> draw( 1, 0, 0 ) {draw}
+  ceiling -> draw( 0.3, 0.3, 0.3 ) {draw}
+
+
+
+
+start__ -> draw( 1, 0, 0 ) {test}
+
+test -> scale(10, 30, 6) { test2 }
+

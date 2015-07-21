@@ -1,0 +1,9 @@
+[package]
+name = "procedural-modeling"
+version = "0.1.0"
+authors = ["Oliver Burghard <burghard@cs.uni-bonn.de>"]
+
+[dependencies]
+glium = "*"
+cgmath = "*"
+
