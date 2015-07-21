@@ -270,7 +270,7 @@ fn do_visulation(geometry: &GeometryData) {
     loop {
         let mut target = display.draw();
         target.clear_color(0.0, 0.0, 0.0, 1.0);
-        target.clear_depth(-q1.0e8);
+        target.clear_depth(-1.0e8);
 
         let mat_proj = Matrix4::from(
             Perspective {left: -1.0, right: 1.0, top: 1.0, bottom: -1.0, near: -1.0, far: 1.0});
