@@ -1,3 +1,5 @@
+use std::ops::{Neg};
+
 use glium;
 
 use glium::glutin::Event::*;
@@ -6,8 +8,7 @@ use glium::glutin::MouseScrollDelta;
 use cgmath::*;
 
 use derivation;
-use derivation::Derivation;
-use derivation::Node;
+use derivation::{Derivation, Node};
 
 struct Viewer {
     distance: f32,
@@ -127,37 +128,12 @@ impl GeometryData {
         self.add_tri(deformation, &[p1, p3, p4], color);
     }
 
-/*    fn add_box(&mut self, deformation: &Matrix4<f32>, color: [f32; 3]) {
-        let p111 = [-1.0, -1.0, -1.0];
-        let p112 = [-1.0, -1.0,  1.0];
-        let p121 = [-1.0,  1.0, -1.0];
-        let p122 = [-1.0,  1.0,  1.0];
-        let p211 = [ 1.0, -1.0, -1.0];
-        let p212 = [ 1.0, -1.0,  1.0];
-        let p221 = [ 1.0,  1.0, -1.0];
-        let p222 = [ 1.0,  1.0,  1.0];
-
-        let faces = vec![
-            [p111, p112, p122, p121],
-            [p121, p122, p222, p221],
-            [p111, p121, p221, p211],
-
-            [p221, p222, p212, p211],
-            [p211, p212, p112, p111],
-            [p212, p222, p122, p112],
-            ];
-        
-        for f in faces {
-            self.add_quad(deformation, &[f[0], f[1], f[2], f[3]], color);
-        }
-    }
-*/
     fn add_box_from_node(&mut self, node: &derivation::Node) {
         let color = node.color;
         println!("color: {:?}", color);
 
         let (c, l, u, f) = (node.center, node.right, node.up, node.front);
-        let (nl, nu, nf) = (l.mul_s(-1.0), u.mul_s(-1.0), f.mul_s(-1.0));
+        let (nl, nu, nf) = (l.neg(), u.neg(), f.neg());
         
         let p111 = c.add_v(&nl).add_v(&nu).add_v(&nf).into_fixed();
         let p112 = c.add_v(&nl).add_v(&nu).add_v(& f).into_fixed();
@@ -183,8 +159,9 @@ impl GeometryData {
         }
     }
     fn add_box_from_node_and_children(&mut self, node: &derivation::Node) {
-        if node.children.len() == 0 {
+        if node.children.len() == 0 && node.name.chars().nth(0) != Some('_') {
             self.add_box_from_node(node);
+            println!("node: {:?}", node);
         }
 
         for c in node.children.iter() {
@@ -260,7 +237,7 @@ fn do_visulation(geometry: &GeometryData) {
 
     implement_vertex!(Vertex, position, color, normal);
 
-    let vertex_buffer = glium::VertexBuffer::new(&display, &geometry.vertices);
+    let vertex_buffer = glium::VertexBuffer::new(&display, &geometry.vertices).unwrap();
     let indices = glium::index::NoIndices(glium::index::PrimitiveType::TrianglesList);
 
     let mut viewer = Viewer::new();
@@ -294,12 +271,11 @@ fn do_visulation(geometry: &GeometryData) {
         let params = glium::DrawParameters {
             depth_test: glium::DepthTest::IfMore,
             depth_write: true,
-//            backface_culling: glium::draw_parameters::BackfaceCullingMode::CullClockWise,
+            backface_culling: glium::draw_parameters::BackfaceCullingMode::CullClockWise,
             .. Default::default()
         };
         
-        target.draw(&vertex_buffer, &indices, &program, &uniforms,
-                    &params).unwrap();
+        target.draw(&vertex_buffer, &indices, &program, &uniforms, &params).unwrap();
         target.finish().unwrap();
 
         for ev in display.poll_events() {

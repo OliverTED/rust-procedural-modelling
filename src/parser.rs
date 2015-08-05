@@ -11,12 +11,21 @@ use std::fs::File;
 use std::io::Read;
 use std::string::String;
 
-use grammar::*;
+use grammar::{Operation, Rule, Grammar};
 
 use tokenizer;
-use tokenizer::{Token, Tokenizer};
+use tokenizer::{Token};
 
 // top down parser
+fn check_next_is(tokens: &[Token], sym: Token) -> bool {
+    tokens[0] == sym
+}
+
+
+fn parse_next(tokens: &[Token]) -> (&Token, &[Token]) {
+    (&tokens[0], &tokens[1..])
+}
+
 fn parse_symbol(tokens: &[Token], sym: Token) -> &[Token] {
     if tokens[0] == sym {
         &tokens[1..]
@@ -71,6 +80,55 @@ fn parse_identifier(tokens_: &[Token]) -> (String, &[Token]) {
     (name, rest)
 }
 
+fn parse_split_outputs(rest: &[Token]) -> ((Vec<String>,Vec<String>,Vec<String>), &[Token]) {
+    let mut rest = parse_symbol(rest, Token::CurlyOpen);
+    let mut outputs1 = Vec::new();
+    let mut outputs2 = Vec::new();
+    let mut outputs3 = Vec::new();
+
+    let mut stage = 0;
+    
+    loop {
+        match &rest[0] {
+            &Token::CurlyClose => {
+                if stage != 2 {
+                    panic!("split operation must contain two '|'!");
+                }
+                rest = &rest[1..];
+                break;
+            }
+            &Token::Vert => {
+                stage += 1;
+
+                if stage > 2 {
+                    panic!("split operation must contain only two '|'!");
+                }
+
+                rest = &rest[1..];
+            }
+            &Token::Identifier(..) => {
+                let (name, rest2) = parse_identifier_token(rest);
+                rest = rest2;
+                match stage{
+                    0 => {&mut outputs1}
+                    1 => {&mut outputs2}
+                    _ => {&mut outputs3}
+                }.push(name.clone());
+            }
+            _ => {panic!(format!("required {{ or identifier; found '{:?}'", rest[0]));}
+        }
+    }
+
+    ((outputs1, outputs2, outputs3), rest)
+}
+
+fn parse_single_output(rest: &[Token]) -> (String, &[Token]) {
+    let rest = parse_symbol(rest, Token::CurlyOpen);
+    let (name, rest) = parse_identifier_token(rest).clone(); 
+    let rest = parse_symbol(rest, Token::CurlyClose);
+    (name.clone(), rest)
+}
+
 fn parse_operation(tokens_: &[Token]) -> (Operation, &[Token]) {
     let rest = tokens_;
     let (id, rest) = parse_identifier_token(rest);
@@ -84,7 +142,8 @@ fn parse_operation(tokens_: &[Token]) -> (Operation, &[Token]) {
             let rest = parse_symbol(rest, Token::Comma);
             let (z, rest) = parse_number(rest);
             let rest = parse_symbol(rest, Token::BraceClose);
-            (Operation::Scale(x, y, z), rest)
+            let (output, rest) = parse_single_output(rest);
+            (Operation::Scale{x:x, y:y, z:z, output:output}, rest)
         }
         "transpose" => {
             let rest = parse_symbol(rest, Token::BraceOpen);
@@ -94,7 +153,8 @@ fn parse_operation(tokens_: &[Token]) -> (Operation, &[Token]) {
             let rest = parse_symbol(rest, Token::Comma);
             let (z, rest) = parse_number(rest);
             let rest = parse_symbol(rest, Token::BraceClose);
-            (Operation::Transpose(x, y, z), rest)
+            let (output, rest) = parse_single_output(rest);
+            (Operation::Transpose{ x:x, y:y, z:z, output:output }, rest)
         }
         "draw" => {
             let rest = parse_symbol(rest, Token::BraceOpen);
@@ -109,15 +169,40 @@ fn parse_operation(tokens_: &[Token]) -> (Operation, &[Token]) {
         "split" => {
             let rest = parse_symbol(rest, Token::BraceOpen);
             let (dir, rest) = parse_identifier(rest);
-            let rest = parse_symbol(rest, Token::Comma);
-            let (len, rest) = parse_number(rest);
+            let (relation, rest) = parse_next(rest);
+            match relation {
+                &Token::Smaller => {}
+                &Token::Greater => {}
+                _ => { panic!(format!("split operation must be one of '<', '>'"))}
+            };
+            let (length, rest) = parse_number(rest);
+            let (post, rest) =
+                if !check_next_is(rest, Token::BraceClose) {
+                    let (sym_, rest) = parse_next(rest);
+                    match sym_ {
+                        &Token::Percent => {}
+                        _ => { panic!(format!("split value might be followed by only '%' but found {:?}", *sym_))}
+                        }
+                    (Some(sym_.clone()), rest)
+                } else {
+                    (None, rest)
+                };
             let rest = parse_symbol(rest, Token::BraceClose);
-            (Operation::Split {dim: dir, size:len}, rest)
+            let (outputs, rest) = parse_split_outputs(rest);
+            (Operation::Split {
+                dim: dir, relation: relation.clone(), size:length,
+                post: post, outputs: outputs}, rest)
         }
         "components" => {
-            let rest = parse_symbol(rest, Token::BraceOpen);
-            let rest = parse_symbol(rest, Token::BraceClose);
-            (Operation::Components, rest)
+            let rest = parse_symbol(rest, Token::CurlyOpen);
+            let (id1, rest) = parse_identifier(rest);
+            let (id2, rest) = parse_identifier(rest);
+            let (id3, rest) = parse_identifier(rest);
+            let (id4, rest) = parse_identifier(rest);
+            let (id5, rest) = parse_identifier(rest);
+            let (id6, rest) = parse_identifier(rest);
+            let rest = parse_symbol(rest, Token::CurlyClose);
+            (Operation::Components { outputs:(id1, id2, id3, id4, id5, id6) }, rest)
         }
         _ => {panic!(format!("operation unknown '{:?}'", id));}
     }
@@ -132,7 +217,7 @@ fn parse_rule(tokens_: &[Token]) -> (Rule, &[Token]) {
     let (operation, rest) = parse_operation(rest);
 
     
-    let mut rest = parse_symbol(rest, Token::CurlyOpen);
+/*    let mut rest = parse_symbol(rest, Token::CurlyOpen);
     let mut output = Vec::new();
     loop {
         match &rest[0] {
@@ -148,9 +233,9 @@ fn parse_rule(tokens_: &[Token]) -> (Rule, &[Token]) {
             _ => {panic!(format!("required {{ or identifier; found '{:?}'", rest[0]));}
         }
 
-    }
+    }*/
     
-    (Rule {input: id, output: output, operation: operation}, rest)
+    (Rule {input: id, operation: operation}, rest)
 }
 
 

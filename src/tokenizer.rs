@@ -19,6 +19,11 @@ pub enum Token {
     DoubleColon,
     Dot,
     Star,
+    Divide,
+    Smaller,
+    Greater,
+    Percent,
+    Vert,
 }
 
 
@@ -78,6 +83,11 @@ fn create_token(ch: char) -> Option<Token> {
         ':' => Some(Token::Colon),
         '.' => Some(Token::Dot),
         '*' => Some(Token::Star),
+        '/' => Some(Token::Divide),
+        '<' => Some(Token::Smaller),
+        '>' => Some(Token::Greater),
+        '%' => Some(Token::Percent),
+        '|' => Some(Token::Vert),
         ' ' | '\n' | '\r' | '\t' => Some(Token::Skip),
         _ => panic!(format!("could not parse {:?}", ch)),
     }
