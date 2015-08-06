@@ -1,11 +1,14 @@
 use std::ops::{Neg};
 
+
+use std::convert::From;
+
 use glium;
 
 use glium::glutin::Event::*;
 use glium::glutin::MouseScrollDelta;
 
-use cgmath::*;
+use cgmath::{Rad, Deg, Matrix4, Point3, Vector3, Vector4, Basis3, Perspective, Angle, Point, Vector, FixedArray, Matrix, Rotation3, Rotation, EuclideanVector};
 
 use derivation;
 use derivation::{Derivation, Node};
@@ -36,16 +39,21 @@ impl Viewer {
             // println!("{:?}", (dx, dy));
             self.rotx = self.rotx.add_a(Rad::<f32>::full_turn().mul_s(dx));
             self.roty = self.roty.add_a(Rad::<f32>::full_turn().mul_s(dy));
+//             println!("view angles: x:{} y:{}", self.rotx.div_a(Rad::<f32>::full_turn()), self.roty.div_a(Rad::<f32>::full_turn()));
         } 
 
         self.last = Some((x, y));
     }
     
     fn mouse_scroll(&mut self, _x: f32, y: f32) {
-        self.distance = (self.distance.ln() - (y as f32) / 10.0).exp()
+        self.distance = (self.distance.ln() - (y as f32) / 10.0).exp();
+        // println!("distance: {}", self.distance);
     }
 
     fn mouse_button(&mut self, _state: glium::glutin::ElementState, _button: glium::glutin::MouseButton) {    }
+    fn set_last(&mut self, x:i32, y:i32) {
+        self.last = Some((x,y));
+    }
 
     fn get_matrix(&self) -> Matrix4<f32> {
         let center = Point3::new(0.0, 0.0, 0.0);
@@ -56,7 +64,7 @@ impl Viewer {
         let rot = rot2.concat(&rot1);
         let eye_vec = rot.rotate_vector(&Vector3::new(1.0, 0.0, 0.0));
         let eye = center.add_v(&eye_vec.mul_s(self.distance));
-           
+        
         Matrix4::<f32>::look_at(&eye, &center, &up)
     }
 }
@@ -234,8 +242,13 @@ void main(void)
 
 fn do_visulation(geometry: &GeometryData) {
     use glium::{DisplayBuild, Surface};
-    let display = glium::glutin::WindowBuilder::new().build_glium().unwrap();
 
+    let display = glium::glutin::WindowBuilder::new().build_glium().unwrap();
+    let window = display.get_window().unwrap();
+
+//    window.set_cursor_state(glium::glutin::CursorState::Hide);
+    window.set_cursor(glium::glutin::MouseCursor::NoneCursor);
+    
     implement_vertex!(Vertex, position, color, normal);
 
     let vertex_buffer = glium::VertexBuffer::new(&display, &geometry.vertices).unwrap();
@@ -279,10 +292,24 @@ fn do_visulation(geometry: &GeometryData) {
         target.draw(&vertex_buffer, &indices, &program, &uniforms, &params).unwrap();
         target.finish().unwrap();
 
+        let (middle_x, middle_y) =
+            if let Some((x,y)) = window.get_inner_size_points() {
+                (x as i32/2, y as i32/2)
+            } else {
+                (100i32, 100i32)
+            };
+        
         for ev in display.poll_events() {
             match ev {
                 glium::glutin::Event::Closed => return,
-                MouseMoved((x, y)) => viewer.mouse_move(x,y),
+                MouseMoved((x, y)) => {
+                    if (x,y) != (middle_x, middle_y) {
+                        viewer.mouse_move(x,y);
+                        window.set_cursor_position(middle_x, middle_y);
+                    } else {
+                        viewer.set_last(x, y);
+                    }
+                },
                 MouseWheel(MouseScrollDelta::LineDelta(x, y)) => viewer.mouse_scroll(x, y),
                 MouseWheel(MouseScrollDelta::PixelDelta(x, y)) => viewer.mouse_scroll(x, y),
                 MouseInput(state, button) => viewer.mouse_button(state, button),
