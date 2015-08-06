@@ -200,8 +200,8 @@ varying vec3 vNormal;
 varying vec3 vColor;
 
 uniform vec3 mainColor;
-uniform float specularExponent;
-uniform vec3 specularColor;
+//uniform float specularExponent;
+//uniform vec3 specularColor;
 // uniform sampler2D mainTexture;
 uniform mat3 _dLight;
 uniform vec3 _ambient;
@@ -211,8 +211,8 @@ void getDirectionalLight(vec3 normal, mat3 dLight, out vec3 diffuse, out float s
     vec3 colorIntensity = dLight[1];
     vec3 halfVector = dLight[2];
     float diffuseContribution = max(dot(normal, ecLightDir), 0.0);
-    float specularContribution = max(dot(normal, halfVector), 0.0);
-    specular =  pow(specularContribution, specularExponent);
+//    float specularContribution = max(dot(normal, halfVector), 0.0);
+//    specular =  pow(specularContribution, specularExponent);
     diffuse = (colorIntensity * diffuseContribution);
 }
 
@@ -226,7 +226,8 @@ void main(void)
     vec4 materialColor = vec4(vColor, 1.0);
 //    vec4 materialColor = texture2D(mainTexture, vUv);
 
-    gl_FragColor = materialColor * vec4(color, 1.0)+vec4(specular*specularColor,0.0);
+//    gl_FragColor = materialColor * vec4(color, 1.0)+vec4(specular*specularColor,0.0);
+    gl_FragColor = materialColor * vec4(color, 1.0);
 }
 "#;
 
