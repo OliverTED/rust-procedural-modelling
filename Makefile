@@ -17,7 +17,7 @@ stop:
 auto:
 	while true; do \
 		make stop; make build && make start; \
-		FILES="$$(find ./src -name '*.rs' -and -not -name '.*') default.txt"; \
+		FILES="$$(find ./src -name '*.rs' -and -not -name '.*')"; \
 		echo $$FILES; \
 		inotifywait -e move -e delete -e create -e close_write $$FILES; \
 	done

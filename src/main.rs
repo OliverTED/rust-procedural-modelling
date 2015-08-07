@@ -14,9 +14,8 @@ mod tokenizer;
 mod parser;
 mod modeler;
 mod visualizer;
+mod events;
 
 fn main() {
-    let grammar = parser::parse("default.txt");
-    let model = modeler::build(&grammar);
-    visualizer::visualize(&model);
+    events::run_main();
 }

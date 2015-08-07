@@ -5,9 +5,6 @@ use std::convert::From;
 
 use glium;
 
-use glium::glutin::Event::*;
-use glium::glutin::MouseScrollDelta;
-
 use cgmath::{Rad, Deg, Matrix4, Point3, Vector3, Vector4, Basis3, Perspective, Angle, Point, Vector, FixedArray, Matrix, Rotation3, Rotation, EuclideanVector};
 
 use derivation;
@@ -15,7 +12,7 @@ use derivation::{Derivation, Node};
 
 use glium::{DisplayBuild, Surface};
 
-struct Viewer {
+pub struct Viewer {
     distance: f32,
     rotx: Rad<f32>,
     roty: Rad<f32>,
@@ -24,7 +21,7 @@ struct Viewer {
 }
 
 impl Viewer {
-    fn new() -> Viewer {
+    pub fn new() -> Viewer {
         Viewer {
             distance: 5.0,
             rotx: Rad::<f32>::zero(),
@@ -34,26 +31,36 @@ impl Viewer {
         }
     }
     
-    fn mouse_move(&mut self, x: i32, y: i32) {
+    pub fn mouse_move(&mut self, x: i32, y: i32) {
         if let Some((lx, ly)) = self.last {
             let (dx, dy) = (0.001 * (x - lx) as f32,-0.001 * (y - ly) as f32);
            
             // println!("{:?}", (dx, dy));
             self.rotx = self.rotx.add_a(Rad::<f32>::full_turn().mul_s(dx));
             self.roty = self.roty.add_a(Rad::<f32>::full_turn().mul_s(dy));
+
+            if self.roty > Rad::<f32>::turn_div_2() {
+                self.roty = Rad::<f32>::turn_div_2();
+            }
+
+            if self.roty < -Rad::<f32>::turn_div_2() {
+                self.roty = -Rad::<f32>::turn_div_2();
+            }
+            
 //             println!("view angles: x:{} y:{}", self.rotx.div_a(Rad::<f32>::full_turn()), self.roty.div_a(Rad::<f32>::full_turn()));
         } 
 
         self.last = Some((x, y));
     }
     
-    fn mouse_scroll(&mut self, _x: f32, y: f32) {
+    pub fn mouse_scroll(&mut self, _x: f32, y: f32) {
         self.distance = (self.distance.ln() - (y as f32) / 10.0).exp();
         // println!("distance: {}", self.distance);
     }
 
-    fn mouse_button(&mut self, _state: glium::glutin::ElementState, _button: glium::glutin::MouseButton) {    }
-    fn set_last(&mut self, x:i32, y:i32) {
+    pub fn mouse_button(&mut self, _state: glium::glutin::ElementState, _button: glium::glutin::MouseButton) {
+    }
+    pub fn set_last(&mut self, x:i32, y:i32) {
         self.last = Some((x,y));
     }
 
@@ -73,21 +80,21 @@ impl Viewer {
 
 
 #[derive(Copy, Clone)]
-struct Vertex {
+pub struct Vertex {
     position: [f32; 3],
     color: [f32; 3],
     normal: [f32; 3],
 }
 
-struct GeometryData {
+pub struct GeometryData {
     vertices: Vec<Vertex>,
 }
 
 impl GeometryData {
-    fn new() -> GeometryData {
+    pub fn new() -> GeometryData {
         GeometryData { vertices: Vec::new() }
     }
-    fn from_derivation(derivation: &derivation::Derivation) -> GeometryData {
+    pub fn from_derivation(derivation: &derivation::Derivation) -> GeometryData {
         let mut data = GeometryData::new();
         data.add_box_from_node_and_children(&derivation.start);
         data
@@ -145,7 +152,7 @@ impl GeometryData {
 
     fn add_box_from_node(&mut self, node: &derivation::Node) {
         let color = node.color;
-        println!("color: {:?}", color);
+//        println!("color: {:?}", color);
 
         let (c, l, u, f) = (node.center, node.right, node.up, node.front);
         let (nl, nu, nf) = (l.neg(), u.neg(), f.neg());
@@ -176,7 +183,7 @@ impl GeometryData {
     fn add_box_from_node_and_children(&mut self, node: &derivation::Node) {
         if node.children.len() == 0 && node.name.chars().nth(0) != Some('_') {
             self.add_box_from_node(node);
-            println!("node: {:?}", node);
+//            println!("node: {:?}", node);
         }
 
         for c in node.children.iter() {
@@ -246,112 +253,73 @@ void main(void)
 }
 "#;
 
-struct Visualization {
-    display: glium::backend::glutin_backend::GlutinFacade,
-    geometry: Option<(glium::Program, glium::VertexBuffer<Vertex>, glium::index::NoIndices)>,
-    viewer: Viewer,
-}
+pub type Display = glium::backend::glutin_backend::GlutinFacade;
+pub type LoadedGeometry = (glium::Program, glium::VertexBuffer<Vertex>, glium::index::NoIndices);
 
-impl Visualization {
-    fn new() -> Visualization {
-        let display = glium::glutin::WindowBuilder::new().build_glium().unwrap();
-        {
-            let window = display.get_window().unwrap();
 
-            //    window.set_cursor_state(glium::glutin::CursorState::Hide);
-            window.set_cursor(glium::glutin::MouseCursor::NoneCursor);
-        }
-        implement_vertex!(Vertex, position, color, normal);
 
-        let mut viewer = Viewer::new();
+pub fn create_display() -> Display {
+    let display = glium::glutin::WindowBuilder::new().build_glium().unwrap();
+    {
+        let window = display.get_window().unwrap();
 
-        Visualization { display:display, geometry:None, viewer:viewer }
+        //    window.set_cursor_state(glium::glutin::CursorState::Hide);
+        window.set_cursor(glium::glutin::MouseCursor::NoneCursor);
     }
+    implement_vertex!(Vertex, position, color, normal);
 
-    fn load_geometry(self, geometry: &GeometryData) -> Visualization {
-        let display = self.display;
-        
-        let vertex_buffer = glium::VertexBuffer::new(&display, &geometry.vertices).unwrap();
-        let indices = glium::index::NoIndices(glium::index::PrimitiveType::TrianglesList);
-
-        let program = glium::Program::from_source(&display, VERTEX_SHADER_SOURCE, FRAGMENT_SHADER_SOURCE, None).unwrap();
-
-        Visualization { geometry:Some((program, vertex_buffer, indices)), display:display, .. self }
-    }
-
-    fn draw(&mut self) {
-        let mut target = self.display.draw();
-        target.clear_color(0.0, 0.0, 0.0, 1.0);
-        target.clear_depth(-1.0e8);
-
-        let mat_proj = Matrix4::from(
-            Perspective {left: -1.0, right: 1.0, top: 1.0, bottom: -1.0, near: -1.0, far: 1.0});
-
-        let mat_mv = self.viewer.get_matrix();
-        let mat_mvp = mat_proj.mul_m(&mat_mv);
-
-        let d_light = [
-            [0.1, -0.2, 0.4],
-            [1.0, 1.0, 1.0],
-            [0.0, 0.0, 0.0]];
-        
-        let uniforms = uniform! {
-            mainColor: [1.0, 1.0, 1.0],
-            _ambient: [0.1, 0.1, 0.1],
-            _mvp: mat_mvp,
-            _mv: mat_mv,
-            _dLight: d_light,
-        };
-
-        let params = glium::DrawParameters {
-            depth_test: glium::DepthTest::IfMore,
-            depth_write: true,
-            backface_culling: glium::draw_parameters::BackfaceCullingMode::CullClockWise,
-            .. Default::default()
-        };
-
-        if let &Some((ref program, ref vertex_buffer, ref index_buffer)) = &self.geometry {
-            target.draw(vertex_buffer, index_buffer, program, &uniforms, &params).unwrap();
-        }
-        
-        target.finish().unwrap();
-    }
+    display
 }
 
 
-pub fn visualize(derivation: &Derivation) {
-    let mut vis = Visualization::new().load_geometry(&GeometryData::from_derivation(derivation));
-        
-    loop {
-        vis.draw();
+pub fn load_geometry(display:&Display, geometry: &GeometryData) -> LoadedGeometry {
+    let vertex_buffer = glium::VertexBuffer::new(display, &geometry.vertices).unwrap();
+    let indices = glium::index::NoIndices(glium::index::PrimitiveType::TrianglesList);
 
-        let window = vis.display.get_window().unwrap();
-        
-        let (middle_x, middle_y) =
-            if let Some((x,y)) = window.get_inner_size_points() {
-                (x as i32/2, y as i32/2)
-            } else {
-                (100i32, 100i32)
-            };
+    let program = glium::Program::from_source(display, VERTEX_SHADER_SOURCE, FRAGMENT_SHADER_SOURCE, None).unwrap();
 
-        for ev in vis.display.poll_events() {
-            match ev {
-                glium::glutin::Event::Closed => return,
-                MouseMoved((x, y)) => {
-                    if (x,y) != (middle_x, middle_y) {
-                        vis.viewer.mouse_move(x,y);
-                        window.set_cursor_position(middle_x, middle_y).unwrap();
-                    } else {
-                        vis.viewer.set_last(x, y);
-                    }
-                },
-                MouseWheel(MouseScrollDelta::LineDelta(x, y)) => vis.viewer.mouse_scroll(x, y),
-                MouseWheel(MouseScrollDelta::PixelDelta(x, y)) => vis.viewer.mouse_scroll(x, y),
-                MouseInput(state, button) => vis.viewer.mouse_button(state, button),
-                _ => ()
-            }
-        }
-    }
+    (program, vertex_buffer, indices)
 }
+
+
+
+pub fn draw_frame(display:&Display, viewer:&Viewer, geometry:Option<&LoadedGeometry>) {
+    let mut target = display.draw();
+    target.clear_color(0.0, 0.0, 0.0, 1.0);
+    target.clear_depth(-1.0e8);
+
+    let mat_proj = Matrix4::from(
+        Perspective {left: -1.0, right: 1.0, top: 1.0, bottom: -1.0, near: -1.0, far: 1.0});
+
+    let mat_mv = viewer.get_matrix();
+    let mat_mvp = mat_proj.mul_m(&mat_mv);
+
+    let d_light = [
+        [0.1, -0.2, 0.4],
+        [1.0, 1.0, 1.0],
+        [0.0, 0.0, 0.0]];
+    
+    let uniforms = uniform! {
+        mainColor: [1.0, 1.0, 1.0],
+        _ambient: [0.1, 0.1, 0.1],
+        _mvp: mat_mvp,
+        _mv: mat_mv,
+        _dLight: d_light,
+    };
+
+    let params = glium::DrawParameters {
+        depth_test: glium::DepthTest::IfMore,
+        depth_write: true,
+        backface_culling: glium::draw_parameters::BackfaceCullingMode::CullClockWise,
+        .. Default::default()
+    };
+
+    if let Some(&(ref program, ref vertex_buffer, ref index_buffer)) = geometry {
+        target.draw(vertex_buffer, index_buffer, program, &uniforms, &params).unwrap();
+    }
+    
+    target.finish().unwrap();
+}
+
 
 
